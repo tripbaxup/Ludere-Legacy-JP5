@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Ludere Legacy Autogen — payload/overlay.xml
+  ============================================
+  Defines touch overlay button layouts for different systems.
+  Positions (x, y) and radius (r) are expressed as fractions of
+  the screen dimensions, making layouts resolution-independent.
+
+  Button IDs: UP DOWN LEFT RIGHT A B X Y START SELECT L R L2 R2 L3 R3
+  Analog IDs: LEFT RIGHT
+-->
+<overlay>
+
+    <!-- NES layout: D-pad + A/B + Start/Select + L/R -->
+    <preset name="nes">
+        <button id="UP"     x="0.12" y="0.35" r="0.06" />
+        <button id="DOWN"   x="0.12" y="0.65" r="0.06" />
+        <button id="LEFT"   x="0.07" y="0.50" r="0.06" />
+        <button id="RIGHT"  x="0.17" y="0.50" r="0.06" />
+        <button id="A"      x="0.88" y="0.55" r="0.06" />
+        <button id="B"      x="0.82" y="0.70" r="0.06" />
+        <button id="SELECT" x="0.38" y="0.85" r="0.05" />
+        <button id="START"  x="0.52" y="0.85" r="0.05" />
+        <button id="L"      x="0.10" y="0.10" r="0.06" />
+        <button id="R"      x="0.90" y="0.10" r="0.06" />
+    </preset>
+
+    <!-- SNES layout: D-pad + A/B/X/Y + Start/Select + L/R -->
+    <preset name="snes">
+        <button id="UP"     x="0.12" y="0.35" r="0.055" />
+        <button id="DOWN"   x="0.12" y="0.65" r="0.055" />
+        <button id="LEFT"   x="0.07" y="0.50" r="0.055" />
+        <button id="RIGHT"  x="0.17" y="0.50" r="0.055" />
+        <button id="A"      x="0.90" y="0.55" r="0.055" />
+        <button id="B"      x="0.84" y="0.70" r="0.055" />
+        <button id="X"      x="0.84" y="0.40" r="0.055" />
+        <button id="Y"      x="0.78" y="0.55" r="0.055" />
+        <button id="SELECT" x="0.38" y="0.85" r="0.045" />
+        <button id="START"  x="0.52" y="0.85" r="0.045" />
+        <button id="L"      x="0.10" y="0.10" r="0.055" />
+        <button id="R"      x="0.90" y="0.10" r="0.055" />
+    </preset>
+
+    <!-- GBA layout: D-pad + A/B + Start/Select + L/R + analog stick -->
+    <preset name="gba">
+        <button id="UP"     x="0.12" y="0.35" r="0.055" />
+        <button id="DOWN"   x="0.12" y="0.65" r="0.055" />
+        <button id="LEFT"   x="0.07" y="0.50" r="0.055" />
+        <button id="RIGHT"  x="0.17" y="0.50" r="0.055" />
+        <button id="A"      x="0.88" y="0.55" r="0.055" />
+        <button id="B"      x="0.82" y="0.70" r="0.055" />
+        <button id="SELECT" x="0.38" y="0.85" r="0.045" />
+        <button id="START"  x="0.52" y="0.85" r="0.045" />
+        <button id="L"      x="0.10" y="0.10" r="0.055" />
+        <button id="R"      x="0.90" y="0.10" r="0.055" />
+    </preset>
+
+    <!-- Genesis layout: D-pad + A/B/C + Start + L/R -->
+    <preset name="genesis">
+        <button id="UP"     x="0.12" y="0.35" r="0.055" />
+        <button id="DOWN"   x="0.12" y="0.65" r="0.055" />
+        <button id="LEFT"   x="0.07" y="0.50" r="0.055" />
+        <button id="RIGHT"  x="0.17" y="0.50" r="0.055" />
+        <button id="A"      x="0.78" y="0.60" r="0.055" />
+        <button id="B"      x="0.85" y="0.55" r="0.055" />
+        <button id="X"      x="0.92" y="0.50" r="0.055" />
+        <button id="Y"      x="0.78" y="0.40" r="0.055" />
+        <button id="START"  x="0.52" y="0.85" r="0.045" />
+        <button id="L"      x="0.10" y="0.10" r="0.055" />
+        <button id="R"      x="0.90" y="0.10" r="0.055" />
+    </preset>
+
+    <!-- Default layout with analog stick (for systems that need it) -->
+    <preset name="default">
+        <button id="UP"     x="0.12" y="0.35" r="0.06" />
+        <button id="DOWN"   x="0.12" y="0.65" r="0.06" />
+        <button id="LEFT"   x="0.07" y="0.50" r="0.06" />
+        <button id="RIGHT"  x="0.17" y="0.50" r="0.06" />
+        <button id="A"      x="0.88" y="0.55" r="0.06" />
+        <button id="B"      x="0.82" y="0.70" r="0.06" />
+        <button id="X"      x="0.82" y="0.40" r="0.06" />
+        <button id="Y"      x="0.76" y="0.55" r="0.06" />
+        <button id="SELECT" x="0.38" y="0.85" r="0.05" />
+        <button id="START"  x="0.52" y="0.85" r="0.05" />
+        <button id="L"      x="0.10" y="0.10" r="0.06" />
+        <button id="R"      x="0.90" y="0.10" r="0.06" />
+        <button id="L2"     x="0.20" y="0.10" r="0.05" />
+        <button id="R2"     x="0.80" y="0.10" r="0.05" />
+        <analog  id="LEFT"  x="0.25" y="0.70" r="0.10" />
+    </preset>
+
+</overlay>

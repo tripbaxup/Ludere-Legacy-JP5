@@ -1,0 +1,2 @@
+rootProject.name = "Ludere Legacy Autogen"
+include ':app'

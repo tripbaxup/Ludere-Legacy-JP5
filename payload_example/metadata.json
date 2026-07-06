@@ -1,0 +1,13 @@
+{
+  "title": "My Retro Game",
+  "year": 1994,
+  "developer": "My Studio",
+  "publisher": "My Publisher",
+  "genre": "Platformer",
+  "players": 1,
+  "description": "A classic retro platformer adventure.",
+  "region": "USA",
+  "system": "NES",
+  "version": "1.0",
+  "appId": "mygame-nes-2024"
+}

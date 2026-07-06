@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="overlay_button">#B3C8C8C8</color>
+    <color name="overlay_pressed">#B350B450</color>
+    <color name="analog_base">#B33C3CA0</color>
+    <color name="analog_knob">#B36464DC</color>
+</resources>
