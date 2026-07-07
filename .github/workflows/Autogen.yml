@@ -35,10 +35,18 @@ jobs:
 
       - name: Verify payload
         run: |
-          test -f autogen/input/config.xml || { echo "Missing config.xml"; exit 1; }
-          test -f autogen/input/icon.png || { echo "Missing icon.png"; exit 1; }
+          XML_COUNT=$(find autogen/input -maxdepth 1 -type f -iname "*.xml" | wc -l)
+          PNG_COUNT=$(find autogen/input -maxdepth 1 -type f -iname "*.png" | wc -l)
 
-          ROM_COUNT=$(find autogen/input -maxdepth 1 -type f ! -name "config.xml" ! -name "icon.png" | wc -l)
+          if [ "$XML_COUNT" -lt 1 ]; then
+            echo "Missing config XML file (*.xml)"; exit 1
+          fi
+
+          if [ "$PNG_COUNT" -lt 1 ]; then
+            echo "Missing icon PNG file (*.png)"; exit 1
+          fi
+
+          ROM_COUNT=$(find autogen/input -maxdepth 1 -type f ! -iname "*.xml" ! -iname "*.png" | wc -l)
 
           if [ "$ROM_COUNT" -ne 1 ]; then
             echo "Payload must contain exactly one ROM file."
