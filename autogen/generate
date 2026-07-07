@@ -84,9 +84,7 @@ cp "$PNG" app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 # Build
 ##############################################
 
-chmod +x gradlew
-
-./gradlew clean assembleRelease
+gradle clean assembleRelease
 
 ##############################################
 # Collect APK
