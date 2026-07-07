@@ -1,51 +1,75 @@
-name: Auto Build
+name: Ludere Payload Autogen
 
 on:
-  push:
-    branches:
-      - main
-      - master
-  pull_request:
+  workflow_dispatch:
+    inputs:
+      payload:
+        description: "Direct Dropbox download URL"
+        required: true
+        type: string
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  build:
+  autogen:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Make Gradle executable
+      - name: Create working directories
         run: |
-          if [ -f gradlew ]; then
-            chmod +x gradlew
-          fi
+          mkdir -p autogen/input
+          mkdir -p autogen/output
 
-      - name: Build Debug APK
+      - name: Download payload
         run: |
-          if [ -f gradlew ]; then
-            ./gradlew assembleDebug
-          else
-            echo "Gradle wrapper not found."
+          curl -fL "${{ inputs.payload }}" -o autogen/input/payload.zip
+
+      - name: Extract payload
+        run: |
+          unzip -oq autogen/input/payload.zip -d autogen/input
+          rm autogen/input/payload.zip
+
+      - name: Verify payload
+        run: |
+          test -f autogen/input/config.xml || { echo "Missing config.xml"; exit 1; }
+          test -f autogen/input/icon.png || { echo "Missing icon.png"; exit 1; }
+
+          ROM_COUNT=$(find autogen/input -maxdepth 1 -type f ! -name "config.xml" ! -name "icon.png" | wc -l)
+
+          if [ "$ROM_COUNT" -ne 1 ]; then
+            echo "Payload must contain exactly one ROM file."
             exit 1
           fi
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xmlstarlet zip unzip
+
+      - name: Run Autogen
+        run: |
+          chmod +x autogen/generate
+          ./autogen/generate
+
+      - name: Package output
+        run: |
+          cd autogen/output
+          zip -r ../output.zip .
+
+      - name: Timestamp
+        id: stamp
+        run: |
+          echo "date=$(date +'%Y-%m-%dT%H-%M-%S')" >> "$GITHUB_OUTPUT"
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: Ludere-Legacy-Debug
-          path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: warn
+          tag_name: payload-${{ steps.stamp.outputs.date }}
+          name: Ludere Payload ${{ steps.stamp.outputs.date }}
+          files: autogen/output.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
