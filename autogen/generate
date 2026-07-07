@@ -77,6 +77,7 @@ if [ -f "$INPUT/overlay.xml" ]; then
     cp "$INPUT/overlay.xml" app/src/main/assets/payload/overlay.xml
 fi
 
+mkdir -p app/src/main/res/mipmap-xxxhdpi
 cp "$PNG" app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
 ##############################################
