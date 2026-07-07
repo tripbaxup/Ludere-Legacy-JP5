@@ -5,54 +5,18 @@
   Place this file at the root of your payload/ directory.
   All fields are optional except where noted.
 -->
-<config>
-
-    <!-- Required: Human-readable game title. Used as the app label. -->
-    <title>My Retro Game</title>
-
-    <!-- Required: Android package name. Must be unique per APK. -->
-    <packageName>com.example.myretrogame</packageName>
-
-    <!-- App version string -->
-    <version>1.0</version>
-
-    <!-- Screen orientation: landscape | portrait | sensor | sensorLandscape | sensorPortrait -->
+<payload>
+    <title>Ludere Legacy Game</title>
+    <package>com.ludere.legacy</package>
+    <versionName>1.0</versionName>
+    <versionCode>1</versionCode>
+    <system>nes</system>
     <orientation>landscape</orientation>
-
-    <!-- Immersive full-screen mode (hides system bars) -->
     <immersive>true</immersive>
-
-    <!--
-      Overlay preset name. Must match a <preset name="..."> in overlay.xml.
-      Built-in presets: nes, snes, gba, genesis, default
-    -->
     <overlayPreset>nes</overlayPreset>
-
-    <!--
-      Libretro core identifier. If omitted, the core is auto-detected
-      from the ROM file extension.
-      Examples: fceumm, snes9x, mgba, gambatte, genesis_plus_gx
-    -->
     <core>fceumm</core>
-
-    <!--
-      Save file location: internal | external
-      "internal" uses the app's private files directory (no permissions needed).
-      "external" uses the app's external files directory (requires permission on API < 29).
-    -->
     <saveLocation>internal</saveLocation>
-
-    <!-- Developer name (metadata only) -->
-    <developer>My Studio</developer>
-
-    <!-- Publisher name (metadata only) -->
-    <publisher>My Publisher</publisher>
-
-    <!--
-      Unique application ID used to name the save folder.
-      Use a stable identifier so saves persist across reinstalls.
-      Example: "mygame-nes-2024"
-    -->
-    <appId>mygame-nes-2024</appId>
-
-</config>
+    <developer>Manus AI</developer>
+    <publisher>Manus AI</publisher>
+    <appId>ludere.legacy.example</appId>
+</payload>

@@ -70,6 +70,13 @@ mkdir -p app/src/main/assets/payload
 cp "$ROM" app/src/main/assets/payload/
 cp "$XML" app/src/main/assets/payload/config.xml
 
+# If an overlay.xml is provided in the input, use it. 
+# Otherwise, we use the integrated overlay.xml in the app assets.
+if [ -f "$INPUT/overlay.xml" ]; then
+    echo "Using custom overlay.xml from payload"
+    cp "$INPUT/overlay.xml" app/src/main/assets/payload/overlay.xml
+fi
+
 cp "$PNG" app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
 ##############################################
