@@ -67,11 +67,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          # Reads gradle/wrapper/gradle-wrapper.properties and provisions
-          # that exact Gradle version, then puts `gradle` on PATH.
-          # This is required because gradle-wrapper.jar is not committed
-          # to this repo, so ./gradlew has nothing to run.
-          gradle-version: wrapper
+          # NOTE: gradle-version: wrapper is unreliable in this action (see
+          # gradle/actions#273) and can silently install the latest Gradle
+          # instead of the version in gradle-wrapper.properties. Pin the
+          # version explicitly to match gradle-wrapper.properties (8.0).
+          gradle-version: "8.0"
 
       - name: Run Autogen
         run: |
