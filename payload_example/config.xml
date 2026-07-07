@@ -16,7 +16,7 @@
     <overlayPreset>nes</overlayPreset>
     <core>fceumm</core>
     <saveLocation>internal</saveLocation>
-    <developer>Manus AI</developer>
-    <publisher>Manus AI</publisher>
+    <developer>Trip Forward</developer>
+    <publisher>Trip Forward</publisher>
     <appId>ludere.legacy.example</appId>
 </payload>
