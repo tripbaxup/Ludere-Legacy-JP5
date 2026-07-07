@@ -1,0 +1,90 @@
+name: Wipe Repo and Extract ZIP
+
+# Runs manually, or automatically whenever a .zip file is pushed to the repo.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "**.zip"
+
+permissions:
+  contents: write
+
+jobs:
+  wipe-and-unzip:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Find ZIP
+        id: zip
+        run: |
+          ZIP=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
+          if [ -z "$ZIP" ]; then
+            echo "No ZIP found at repo root. Aborting."
+            exit 1
+          fi
+          echo "zip=$ZIP" >> "$GITHUB_OUTPUT"
+          echo "Found ZIP: $ZIP"
+
+      - name: Delete everything except the ZIP and .git
+        run: |
+          ZIP_NAME="$(basename "${{ steps.zip.outputs.zip }}")"
+          echo "Preserving: $ZIP_NAME"
+          find . -mindepth 1 -maxdepth 1 \
+            ! -name ".git" \
+            ! -name "$ZIP_NAME" \
+            -exec rm -rf {} +
+
+      - name: Extract archive
+        run: |
+          ZIP_NAME="$(basename "${{ steps.zip.outputs.zip }}")"
+          mkdir __extracted
+          unzip -q "$ZIP_NAME" -d __extracted
+
+      - name: Flatten directory if needed
+        run: |
+          # If the zip contains a single top-level folder (e.g. repo-main/),
+          # move its contents up so the repo root matches the intended structure.
+          COUNT=$(find __extracted -mindepth 1 -maxdepth 1 | wc -l)
+          TOP=$(find __extracted -mindepth 1 -maxdepth 1 -type d | head -n1)
+
+          if [ "$COUNT" -eq 1 ] && [ -n "$TOP" ]; then
+            shopt -s dotglob
+            mv "$TOP"/* .
+            shopt -u dotglob
+          else
+            shopt -s dotglob
+            mv __extracted/* .
+            shopt -u dotglob
+          fi
+
+          rm -rf __extracted
+
+      - name: Remove ZIP
+        run: |
+          ZIP_NAME="$(basename "${{ steps.zip.outputs.zip }}")"
+          rm -f "$ZIP_NAME"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+
+          git commit -m "Wipe repo and extract uploaded project"
+          git push
+          
