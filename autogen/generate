@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+INPUT="autogen/input"
+OUTPUT="autogen/output"
+
+rm -rf "$OUTPUT"
+mkdir -p "$OUTPUT"
+
+echo "Searching payload..."
+
+XML=$(find "$INPUT" -maxdepth 1 -type f -iname "*.xml" | head -n1)
+PNG=$(find "$INPUT" -maxdepth 1 -type f -iname "*.png" | head -n1)
+
+if [ -z "$XML" ]; then
+    echo "ERROR: No XML file found."
+    exit 1
+fi
+
+if [ -z "$PNG" ]; then
+    echo "ERROR: No PNG file found."
+    exit 1
+fi
+
+ROM=""
+
+while IFS= read -r FILE
+do
+    BASENAME=$(basename "$FILE")
+
+    case "$BASENAME" in
+        *.xml|*.XML|*.png|*.PNG)
+            ;;
+        *)
+            ROM="$FILE"
+            ;;
+    esac
+done < <(find "$INPUT" -maxdepth 1 -type f)
+
+if [ -z "$ROM" ]; then
+    echo "ERROR: No ROM found."
+    exit 1
+fi
+
+echo "Found:"
+echo "  XML : $(basename "$XML")"
+echo "  Icon: $(basename "$PNG")"
+echo "  ROM : $(basename "$ROM")"
+
+##############################################
+# Read metadata
+##############################################
+
+TITLE=$(xmlstarlet sel -t -v "/payload/title" "$XML" 2>/dev/null || echo "Ludere Legacy")
+PACKAGE=$(xmlstarlet sel -t -v "/payload/package" "$XML" 2>/dev/null || echo "com.ludere.legacy")
+VERSION=$(xmlstarlet sel -t -v "/payload/versionName" "$XML" 2>/dev/null || echo "1.0")
+VERSIONCODE=$(xmlstarlet sel -t -v "/payload/versionCode" "$XML" 2>/dev/null || echo "1")
+SYSTEM=$(xmlstarlet sel -t -v "/payload/system" "$XML" 2>/dev/null || echo "")
+
+echo "Title: $TITLE"
+echo "Package: $PACKAGE"
+echo "System: $SYSTEM"
+
+##############################################
+# Prepare Android project
+##############################################
+
+mkdir -p app/src/main/assets/payload
+
+cp "$ROM" app/src/main/assets/payload/
+cp "$XML" app/src/main/assets/payload/config.xml
+
+cp "$PNG" app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+
+##############################################
+# Build
+##############################################
+
+chmod +x gradlew
+
+./gradlew clean assembleRelease
+
+##############################################
+# Collect APK
+##############################################
+
+APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n1)
+
+if [ ! -f "$APK" ]; then
+    echo "APK build failed."
+    exit 1
+fi
+
+cp "$APK" "$OUTPUT/${TITLE}.apk"
+
+echo "Done."
