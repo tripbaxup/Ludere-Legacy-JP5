@@ -54,8 +54,11 @@ public class InputManager {
 
     private static final int BUTTON_COUNT = 16;
 
-    // Button state: true = pressed
-    private final boolean[] mButtonState = new boolean[BUTTON_COUNT];
+    // Button state, split by source so releasing one input doesn't get
+    // masked by another still being held (and so overlay presses don't
+    // latch forever -- see getInputState()).
+    private final boolean[] mPhysicalButtonState = new boolean[BUTTON_COUNT];
+    private final boolean[] mOverlayButtonState  = new boolean[BUTTON_COUNT];
 
     // Analog axes: values in [-0x7fff, 0x7fff]
     private int mLeftAxisX  = 0;
@@ -73,11 +76,12 @@ public class InputManager {
 
     /** Called each frame before input_state queries. */
     public void pollInput() {
-        // Merge overlay state into button array
+        // Overlay state is read fresh each frame (not merged with OR),
+        // so releasing an overlay button actually releases it.
         if (mOverlay != null) {
             boolean[] overlayState = mOverlay.getButtonState();
-            for (int i = 0; i < BUTTON_COUNT && i < overlayState.length; i++) {
-                mButtonState[i] |= overlayState[i];
+            for (int i = 0; i < BUTTON_COUNT; i++) {
+                mOverlayButtonState[i] = i < overlayState.length && overlayState[i];
             }
             // Overlay analog
             int[] analog = mOverlay.getAnalogState();
@@ -98,7 +102,7 @@ public class InputManager {
         switch (device) {
             case 1: // RETRO_DEVICE_JOYPAD
                 if (id >= 0 && id < BUTTON_COUNT) {
-                    return mButtonState[id] ? 1 : 0;
+                    return (mPhysicalButtonState[id] || mOverlayButtonState[id]) ? 1 : 0;
                 }
                 return 0;
             case 5: // RETRO_DEVICE_ANALOG
@@ -117,13 +121,13 @@ public class InputManager {
 
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         int btn = keyCodeToRetroButton(keyCode);
-        if (btn >= 0) { mButtonState[btn] = true; return true; }
+        if (btn >= 0) { mPhysicalButtonState[btn] = true; return true; }
         return false;
     }
 
     public boolean onKeyUp(int keyCode, KeyEvent event) {
         int btn = keyCodeToRetroButton(keyCode);
-        if (btn >= 0) { mButtonState[btn] = false; return true; }
+        if (btn >= 0) { mPhysicalButtonState[btn] = false; return true; }
         return false;
     }
 
@@ -137,10 +141,10 @@ public class InputManager {
             // D-pad via HAT axes
             float hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X);
             float hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y);
-            mButtonState[RETRO_DEVICE_ID_JOYPAD_LEFT]  = hatX < -0.5f;
-            mButtonState[RETRO_DEVICE_ID_JOYPAD_RIGHT] = hatX >  0.5f;
-            mButtonState[RETRO_DEVICE_ID_JOYPAD_UP]    = hatY < -0.5f;
-            mButtonState[RETRO_DEVICE_ID_JOYPAD_DOWN]  = hatY >  0.5f;
+            mPhysicalButtonState[RETRO_DEVICE_ID_JOYPAD_LEFT]  = hatX < -0.5f;
+            mPhysicalButtonState[RETRO_DEVICE_ID_JOYPAD_RIGHT] = hatX >  0.5f;
+            mPhysicalButtonState[RETRO_DEVICE_ID_JOYPAD_UP]    = hatY < -0.5f;
+            mPhysicalButtonState[RETRO_DEVICE_ID_JOYPAD_DOWN]  = hatY >  0.5f;
             return true;
         }
         return false;
@@ -179,9 +183,12 @@ public class InputManager {
         return (int) (v * 0x7fff);
     }
 
-    /** Reset all button states (call at start of each frame after polling). */
+    /** Reset all button states. */
     public void resetFrame() {
-        for (int i = 0; i < BUTTON_COUNT; i++) mButtonState[i] = false;
+        for (int i = 0; i < BUTTON_COUNT; i++) {
+            mPhysicalButtonState[i] = false;
+            mOverlayButtonState[i]  = false;
+        }
         mLeftAxisX = mLeftAxisY = mRightAxisX = mRightAxisY = 0;
     }
 }
