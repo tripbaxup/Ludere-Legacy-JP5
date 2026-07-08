@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <limits.h>
 
 /* ── Pixel formats ─────────────────────────────────────────────────────────── */
 enum retro_pixel_format {
