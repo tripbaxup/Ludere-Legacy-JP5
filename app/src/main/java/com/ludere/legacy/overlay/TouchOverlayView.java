@@ -174,67 +174,86 @@ public class TouchOverlayView extends View {
 
     // ─── Touch handling ────────────────────────────────────────────────────────
 
+    // A pointer must move this much further outside a button's radius to
+    // release it than it needed to be inside to press it. Without this,
+    // small finger tremor right at the edge of a (small) D-pad button
+    // flickers the button on/off rapidly, which looks like the input is
+    // being spammed even though the finger barely moved.
+    private static final float RELEASE_RADIUS_MULTIPLIER = 1.35f;
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         int action = event.getActionMasked();
         int w = getWidth();
         int h = getHeight();
 
-        // Reset all overlay button states each event
-        for (OverlayButton btn : mButtons) btn.pressed = false;
-        mAnalogState[0] = 0;
-        mAnalogState[1] = 0;
-
         if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            for (OverlayButton btn : mButtons) btn.pressed = false;
+            mAnalogState[0] = 0;
+            mAnalogState[1] = 0;
+            syncButtonState();
             invalidate();
             return true;
         }
 
-        // Process all active pointers
-        for (int i = 0; i < event.getPointerCount(); i++) {
-            float tx = event.getX(i);
-            float ty = event.getY(i);
+        // Check buttons with hysteresis: a button that's already pressed
+        // stays pressed until a pointer moves outside the larger release
+        // radius, instead of re-testing the exact press radius every event.
+        for (OverlayButton btn : mButtons) {
+            float cx = btn.xPct * w;
+            float cy = btn.yPct * h;
+            float pressR   = btn.radiusPct * Math.min(w, h) * mScale;
+            float releaseR = pressR * RELEASE_RADIUS_MULTIPLIER;
+            float threshold = btn.pressed ? releaseR : pressR;
 
-            // Check buttons
-            for (OverlayButton btn : mButtons) {
-                float cx = btn.xPct * w;
-                float cy = btn.yPct * h;
-                float r  = btn.radiusPct * Math.min(w, h) * mScale;
-                float dx = tx - cx;
-                float dy = ty - cy;
-                if (dx * dx + dy * dy <= r * r) {
-                    btn.pressed = true;
+            boolean near = false;
+            for (int i = 0; i < event.getPointerCount(); i++) {
+                float dx = event.getX(i) - cx;
+                float dy = event.getY(i) - cy;
+                if (dx * dx + dy * dy <= threshold * threshold) {
+                    near = true;
+                    break;
                 }
             }
+            btn.pressed = near;
+        }
 
-            // Check analog stick
-            if (mAnalogStick != null) {
-                float cx   = mAnalogStick.xPct * w;
-                float cy   = mAnalogStick.yPct * h;
-                float base = mAnalogStick.radiusPct * Math.min(w, h) * mScale;
+        // Analog stick: no hysteresis needed, it's continuous rather than
+        // digital, so it's recomputed fresh each event.
+        mAnalogState[0] = 0;
+        mAnalogState[1] = 0;
+        if (mAnalogStick != null) {
+            float cx   = mAnalogStick.xPct * w;
+            float cy   = mAnalogStick.yPct * h;
+            float base = mAnalogStick.radiusPct * Math.min(w, h) * mScale;
+            for (int i = 0; i < event.getPointerCount(); i++) {
+                float tx = event.getX(i);
+                float ty = event.getY(i);
                 float dx = tx - cx;
                 float dy = ty - cy;
                 if (dx * dx + dy * dy <= base * base) {
                     float nx = dx / base;
                     float ny = dy / base;
-                    // Clamp to unit circle
                     float len = (float) Math.sqrt(nx * nx + ny * ny);
                     if (len > 1f) { nx /= len; ny /= len; }
                     mAnalogState[0] = (int) (nx * 0x7fff);
                     mAnalogState[1] = (int) (ny * 0x7fff);
+                    break;
                 }
             }
         }
 
-        // Sync to mButtonState array
+        syncButtonState();
+        invalidate();
+        return true;
+    }
+
+    private void syncButtonState() {
         for (OverlayButton btn : mButtons) {
             if (btn.retroButtonId >= 0 && btn.retroButtonId < mButtonState.length) {
                 mButtonState[btn.retroButtonId] = btn.pressed;
             }
         }
-
-        invalidate();
-        return true;
     }
 
     // ─── State accessors ───────────────────────────────────────────────────────
