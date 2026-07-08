@@ -73,6 +73,12 @@ jobs:
           # version explicitly to match gradle-wrapper.properties (8.0).
           gradle-version: "8.0"
 
+      - name: Install CMake
+        run: |
+          # Must match the "version" pinned in app/build.gradle's
+          # externalNativeBuild.cmake block.
+          yes | sdkmanager --install "cmake;3.22.1"
+
       - name: Run Autogen
         run: |
           chmod +x autogen/generate
