@@ -35,6 +35,7 @@ public class SaveManager {
 
     private static final String SRAM_FILENAME       = "sram.srm";
     private static final String STATE_FILENAME_FMT  = "state_%d.state";
+    private static final String AUTOSAVE_FILENAME   = "autosave.state";
     private static final int    MAX_STATE_SLOTS      = 10;
 
     private final Context       mContext;
@@ -149,6 +150,47 @@ public class SaveManager {
     /** Returns true if a save state exists in the given slot. */
     public boolean hasState(int slot) {
         return new File(mSaveDir, String.format(STATE_FILENAME_FMT, slot)).exists();
+    }
+
+    // ─── Autosave (resume-on-relaunch) ────────────────────────────────────────
+    //
+    // Separate from the numbered user save-state slots above: this captures
+    // a full emulation snapshot automatically on pause/destroy so the game
+    // resumes exactly where it was left, even if the app was killed
+    // abruptly rather than closed via an in-game save.
+
+    /** Write a full state snapshot to the dedicated autosave file. */
+    public void saveAutoState() {
+        try {
+            byte[] data = nativeGetState();
+            if (data == null || data.length == 0) return;
+            writeFile(new File(mSaveDir, AUTOSAVE_FILENAME), data);
+            Log.d(TAG, "Autosave written (" + data.length + " bytes)");
+        } catch (UnsatisfiedLinkError e) {
+            Log.w(TAG, "Native state not available yet");
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to write autosave", e);
+        }
+    }
+
+    /** Restore the autosave snapshot, if one exists. */
+    public void loadAutoState() {
+        File f = new File(mSaveDir, AUTOSAVE_FILENAME);
+        if (!f.exists()) return;
+        try {
+            byte[] data = readFile(f);
+            nativeSetState(data);
+            Log.i(TAG, "Autosave restored (" + data.length + " bytes)");
+        } catch (UnsatisfiedLinkError e) {
+            Log.w(TAG, "Native state not available yet");
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to restore autosave", e);
+        }
+    }
+
+    /** Returns true if an autosave snapshot exists. */
+    public boolean hasAutoState() {
+        return new File(mSaveDir, AUTOSAVE_FILENAME).exists();
     }
 
     // ─── File I/O helpers ──────────────────────────────────────────────────────
