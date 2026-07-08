@@ -85,8 +85,16 @@ public class LibretroRuntime {
 
             Log.i(TAG, "Starting emulation: rom=" + mRomPath + " core=" + mConfig.core);
 
-            // Initialize native runtime
-            nativeInit(mRomPath, mConfig.core, mSavePath);
+            // Initialize native runtime. Pass the app's actual native
+            // library directory explicitly rather than relying on the
+            // core to be found by bare filename via dlopen() -- bare-name
+            // resolution depends on LD_LIBRARY_PATH being set correctly
+            // by the OS's zygote/app_process for this process, which
+            // isn't reliable on all (especially older/modified OEM)
+            // Android builds. ApplicationInfo.nativeLibraryDir is always
+            // correct since it comes straight from PackageManager.
+            String nativeLibDir = mContext.getApplicationInfo().nativeLibraryDir;
+            nativeInit(mRomPath, mConfig.core, mSavePath, nativeLibDir);
 
             // Restore persisted save data now that the core + ROM are
             // loaded. Load SRAM first (in-cart save), then the autosave
@@ -240,7 +248,7 @@ public class LibretroRuntime {
 
     // ─── Native methods ────────────────────────────────────────────────────────
 
-    private native void nativeInit(String romPath, String coreId, String savePath);
+    private native void nativeInit(String romPath, String coreId, String savePath, String nativeLibDir);
     private native void nativeRunFrame();
     private native void nativePause();
     private native void nativeResume();
