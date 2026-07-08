@@ -50,6 +50,7 @@ static void  (*g_retro_set_audio_sample)(retro_audio_sample_t)     = NULL;
 static void  (*g_retro_set_audio_sample_batch)(retro_audio_sample_batch_t) = NULL;
 static void  (*g_retro_set_input_poll)(retro_input_poll_t)         = NULL;
 static void  (*g_retro_set_input_state)(retro_input_state_t)       = NULL;
+static void  (*g_retro_get_system_av_info)(struct retro_system_av_info*) = NULL;
 
 /* JNI references */
 static JavaVM*  g_jvm      = NULL;
@@ -65,6 +66,10 @@ static bool g_paused = false;
  * Per libretro spec, cores default to 0RGB1555 until they negotiate
  * something else. */
 static enum retro_pixel_format g_pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
+
+/* Core's real target frame rate, from retro_get_system_av_info().
+ * Defaults to standard NTSC ~60fps until the core reports otherwise. */
+static double g_target_fps = 60.098;
 
 /* ── JNI helper ───────────────────────────────────────────────────────────── */
 
@@ -231,6 +236,7 @@ static void load_core_symbols(void) {
     LOAD_SYM(retro_set_audio_sample_batch)
     LOAD_SYM(retro_set_input_poll)
     LOAD_SYM(retro_set_input_state)
+    LOAD_SYM(retro_get_system_av_info)
 }
 
 /* ── JNI_OnLoad ───────────────────────────────────────────────────────────── */
@@ -251,6 +257,7 @@ Java_com_ludere_legacy_libretro_LibretroRuntime_nativeInit(
     if (g_runtime) (*env)->DeleteGlobalRef(env, g_runtime);
     g_runtime = (*env)->NewGlobalRef(env, thiz);
     g_pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
+    g_target_fps   = 60.098;
 
     jclass cls = (*env)->GetObjectClass(env, thiz);
     g_onVideoFrame = (*env)->GetMethodID(env, cls, "onVideoFrame", "([IIII)V");
@@ -294,8 +301,25 @@ Java_com_ludere_legacy_libretro_LibretroRuntime_nativeInit(
         LOGE("retro_load_game failed for: %s", rom);
     } else {
         LOGI("ROM loaded: %s", rom);
+
+        if (g_retro_get_system_av_info) {
+            struct retro_system_av_info av_info;
+            memset(&av_info, 0, sizeof(av_info));
+            g_retro_get_system_av_info(&av_info);
+            if (av_info.timing.fps > 0.0) {
+                g_target_fps = av_info.timing.fps;
+            }
+            LOGI("Core target fps: %.3f", g_target_fps);
+        }
     }
     (*env)->ReleaseStringUTFChars(env, romPath, rom);
+}
+
+JNIEXPORT jdouble JNICALL
+Java_com_ludere_legacy_libretro_LibretroRuntime_nativeGetTargetFps(
+    JNIEnv* env, jobject thiz)
+{
+    return (jdouble)g_target_fps;
 }
 
 JNIEXPORT void JNICALL
@@ -388,3 +412,4 @@ Java_com_ludere_legacy_saves_SaveManager_nativeSetState(
     g_retro_unserialize((const void*)src, (size_t)len);
     (*env)->ReleaseByteArrayElements(env, data, src, JNI_ABORT);
 }
+
