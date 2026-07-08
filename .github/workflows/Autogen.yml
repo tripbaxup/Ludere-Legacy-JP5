@@ -77,7 +77,10 @@ jobs:
         run: |
           # Must match the "version" pinned in app/build.gradle's
           # externalNativeBuild.cmake block.
-          yes | sdkmanager --install "cmake;3.22.1"
+          # sdkmanager isn't on PATH by default on hosted runners, so
+          # locate it under the SDK's cmdline-tools directory.
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort -V | tail -n1)"
+          yes | "$SDKMANAGER" --install "cmake;3.22.1"
 
       - name: Run Autogen
         run: |
