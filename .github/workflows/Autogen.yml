@@ -58,11 +58,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xmlstarlet zip unzip
 
-      - name: Set up JDK
+      - name: Set up JDKs
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "11"
+          # sdkmanager (recent cmdline-tools) requires JDK 17, but AGP
+          # 7.4.2 / Gradle 8.0 need JDK 11. Install both; JAVA_HOME ends up
+          # pointing at the last entry (11), used for the Gradle build.
+          # JDK 17 is still available via JAVA_HOME_17_X64 for the
+          # "Install CMake" step below.
+          java-version: |
+            17
+            11
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -78,7 +85,10 @@ jobs:
           # Must match the "version" pinned in app/build.gradle's
           # externalNativeBuild.cmake block.
           # sdkmanager isn't on PATH by default on hosted runners, so
-          # locate it under the SDK's cmdline-tools directory.
+          # locate it under the SDK's cmdline-tools directory. It also
+          # requires JDK 17 to run, so override JAVA_HOME for this step
+          # only (the Gradle build later still uses JDK 11).
+          export JAVA_HOME="$JAVA_HOME_17_X64"
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort -V | tail -n1)"
           yes | "$SDKMANAGER" --install "cmake;3.22.1"
 
