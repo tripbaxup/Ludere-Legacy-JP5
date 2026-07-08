@@ -34,6 +34,7 @@ jobs:
           rm autogen/input/payload.zip
 
       - name: Verify payload
+        id: verify
         run: |
           XML_COUNT=$(find autogen/input -maxdepth 1 -type f -iname "*.xml" | wc -l)
           PNG_COUNT=$(find autogen/input -maxdepth 1 -type f -iname "*.png" | wc -l)
@@ -46,12 +47,16 @@ jobs:
             echo "Missing icon PNG file (*.png)"; exit 1
           fi
 
-          ROM_COUNT=$(find autogen/input -maxdepth 1 -type f ! -iname "*.xml" ! -iname "*.png" | wc -l)
+          ROM=$(find autogen/input -maxdepth 1 -type f ! -iname "*.xml" ! -iname "*.png")
+          ROM_COUNT=$(echo "$ROM" | grep -c . || true)
 
           if [ "$ROM_COUNT" -ne 1 ]; then
             echo "Payload must contain exactly one ROM file."
             exit 1
           fi
+
+          EXT="${ROM##*.}"
+          echo "rom_ext=${EXT,,}" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
         run: |
@@ -91,6 +96,57 @@ jobs:
           export JAVA_HOME="$JAVA_HOME_17_X64"
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | sort -V | tail -n1)"
           yes | "$SDKMANAGER" --install "cmake;3.22.1"
+
+      - name: Download libretro core
+        run: |
+          # Mirrors the extension -> core mapping in CoreSelector.java.
+          # Keep these two in sync if new systems are added.
+          case "${{ steps.verify.outputs.rom_ext }}" in
+            nes|fds|unf|unif)      CORE="fceumm" ;;
+            sfc|smc|fig)           CORE="snes9x" ;;
+            gb|gbc|sgb)            CORE="gambatte" ;;
+            gba|agb)               CORE="mgba" ;;
+            gen|md|smd|bin)        CORE="genesis_plus_gx" ;;
+            sms)                   CORE="genesis_plus_gx" ;;
+            gg)                    CORE="genesis_plus_gx" ;;
+            pce)                   CORE="mednafen_pce_fast" ;;
+            n64|z64|v64)           CORE="mupen64plus_next"; DOWNLOAD_CORE="mupen64plus_next_gles3" ;;
+            cue|iso)               CORE="mednafen_psx_hw" ;;
+            nds)                   CORE="desmume2015" ;;
+            zip)                   CORE="mame2003_plus" ;;
+            *)
+              echo "No core mapping for extension: ${{ steps.verify.outputs.rom_ext }}"
+              exit 1
+              ;;
+          esac
+
+          # DOWNLOAD_CORE is the buildbot filename; CORE is the id
+          # CoreSelector.java / nativeInit expect (matters when the
+          # buildbot's core name differs from the app's core id, e.g. N64).
+          DOWNLOAD_CORE="${DOWNLOAD_CORE:-$CORE}"
+
+          echo "Selected core: $CORE (downloading $DOWNLOAD_CORE)"
+          BASE_URL="https://buildbot.libretro.com/nightly/android/latest"
+
+          for ABI in armeabi-v7a arm64-v8a x86 x86_64; do
+            DEST_DIR="app/src/main/jniLibs/$ABI"
+            mkdir -p "$DEST_DIR"
+
+            URL="$BASE_URL/$ABI/${DOWNLOAD_CORE}_libretro_android.so.zip"
+            echo "Fetching $URL"
+            curl -fL "$URL" -o "core.zip"
+
+            unzip -oq "core.zip" -d "core_extract_$ABI"
+            SO_FILE=$(find "core_extract_$ABI" -name "*.so" | head -n1)
+
+            if [ -z "$SO_FILE" ]; then
+              echo "No .so found in downloaded core archive for $ABI"
+              exit 1
+            fi
+
+            cp "$SO_FILE" "$DEST_DIR/lib${CORE}_libretro.so"
+            rm -rf "core.zip" "core_extract_$ABI"
+          done
 
       - name: Run Autogen
         run: |
