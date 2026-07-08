@@ -135,15 +135,23 @@ public class MainActivity extends Activity {
         if (mRuntime != null) mRuntime.pause();
         if (mAudioEngine != null) mAudioEngine.pause();
         if (mGLSurfaceView != null) mGLSurfaceView.onPause();
-        // Auto-save SRAM on pause
-        if (mSaveManager != null) mSaveManager.saveSRAM();
+        // onPause is the last lifecycle callback guaranteed to run before
+        // the OS may kill the process (onDestroy is not guaranteed on an
+        // abrupt close), so this is where persistence has to happen.
+        if (mSaveManager != null) {
+            mSaveManager.saveSRAM();
+            mSaveManager.saveAutoState();
+        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         if (mRuntimeStarted) {
-            if (mSaveManager != null) mSaveManager.saveSRAM();
+            if (mSaveManager != null) {
+                mSaveManager.saveSRAM();
+                mSaveManager.saveAutoState();
+            }
             if (mRuntime != null) mRuntime.stop();
             if (mAudioEngine != null) mAudioEngine.release();
         }
