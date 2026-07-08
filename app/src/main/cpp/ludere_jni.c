@@ -251,7 +251,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved) {
 JNIEXPORT void JNICALL
 Java_com_ludere_legacy_libretro_LibretroRuntime_nativeInit(
     JNIEnv* env, jobject thiz,
-    jstring romPath, jstring coreId, jstring savePath)
+    jstring romPath, jstring coreId, jstring savePath, jstring nativeLibDir)
 {
     /* Cache Java object and method IDs */
     if (g_runtime) (*env)->DeleteGlobalRef(env, g_runtime);
@@ -265,11 +265,17 @@ Java_com_ludere_legacy_libretro_LibretroRuntime_nativeInit(
     g_onInputPoll  = (*env)->GetMethodID(env, cls, "onInputPoll",   "()V");
     g_onInputState = (*env)->GetMethodID(env, cls, "onInputState",  "(IIII)I");
 
-    /* Build core .so path: libXXX_libretro.so in native library dir */
+    /* Build core .so path: libXXX_libretro.so in the app's real native
+     * library directory. Using the full absolute path (rather than a bare
+     * filename left for the dynamic linker to resolve via LD_LIBRARY_PATH)
+     * avoids relying on that env var being set correctly by the OS's
+     * zygote/app_process -- not guaranteed on all Android builds. */
     const char* core = (*env)->GetStringUTFChars(env, coreId, NULL);
-    char soname[256];
-    snprintf(soname, sizeof(soname), "lib%s_libretro.so", core);
+    const char* libDir = (*env)->GetStringUTFChars(env, nativeLibDir, NULL);
+    char soname[512];
+    snprintf(soname, sizeof(soname), "%s/lib%s_libretro.so", libDir, core);
     (*env)->ReleaseStringUTFChars(env, coreId, core);
+    (*env)->ReleaseStringUTFChars(env, nativeLibDir, libDir);
 
     /* dlopen the core from the app's native library directory */
     g_core_handle = dlopen(soname, RTLD_LAZY);
@@ -412,4 +418,3 @@ Java_com_ludere_legacy_saves_SaveManager_nativeSetState(
     g_retro_unserialize((const void*)src, (size_t)len);
     (*env)->ReleaseByteArrayElements(env, data, src, JNI_ABORT);
 }
-
