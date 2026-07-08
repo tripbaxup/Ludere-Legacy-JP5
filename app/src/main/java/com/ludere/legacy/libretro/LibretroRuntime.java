@@ -88,6 +88,15 @@ public class LibretroRuntime {
             // Initialize native runtime
             nativeInit(mRomPath, mConfig.core, mSavePath);
 
+            // Restore persisted save data now that the core + ROM are
+            // loaded. Load SRAM first (in-cart save), then the autosave
+            // snapshot if one exists -- the snapshot's own serialized SRAM
+            // will take precedence, giving an exact resume point.
+            mSaveManager.loadSRAM();
+            if (mSaveManager.hasAutoState()) {
+                mSaveManager.loadAutoState();
+            }
+
             // Start emulation loop on a dedicated thread
             mRunning = true;
             mEmulationThread = new Thread(mEmulationLoop, "LudereEmulation");
@@ -99,9 +108,24 @@ public class LibretroRuntime {
         }
     }
 
+    // Set by the emulation loop right before it parks in wait(), so pause()
+    // can confirm the loop has actually stopped touching the native core
+    // before returning -- important because callers like MainActivity.onPause
+    // save state (nativeGetState/nativeGetSRAM) right after pause() returns,
+    // and that must not race with retro_run() still executing on the loop
+    // thread.
+    private volatile boolean mThreadParked = false;
+
     public void pause() {
         mPaused = true;
         nativePause();
+
+        long deadline = System.currentTimeMillis() + 500;
+        while (!mThreadParked
+                && mEmulationThread != null && mEmulationThread.isAlive()
+                && System.currentTimeMillis() < deadline) {
+            try { Thread.sleep(2); } catch (InterruptedException ignored) {}
+        }
     }
 
     public void resume() {
@@ -142,7 +166,9 @@ public class LibretroRuntime {
             while (mRunning) {
                 if (mPaused) {
                     synchronized (this) {
+                        mThreadParked = true;
                         try { wait(); } catch (InterruptedException ignored) {}
+                        mThreadParked = false;
                     }
                     // Don't let a long pause cause a burst of catch-up frames.
                     nextFrameTime = System.nanoTime();
