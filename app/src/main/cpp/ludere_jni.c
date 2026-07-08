@@ -61,6 +61,11 @@ static jmethodID g_onInputState   = NULL;
 
 static bool g_paused = false;
 
+/* Pixel format negotiated via RETRO_ENVIRONMENT_SET_PIXEL_FORMAT.
+ * Per libretro spec, cores default to 0RGB1555 until they negotiate
+ * something else. */
+static enum retro_pixel_format g_pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
+
 /* ── JNI helper ───────────────────────────────────────────────────────────── */
 
 static JNIEnv* get_env(void) {
@@ -80,16 +85,60 @@ static void video_refresh_cb(const void* data, unsigned width, unsigned height, 
     jintArray pixels = (*env)->NewIntArray(env, total);
     if (!pixels) return;
 
-    /* Convert XRGB8888 to Java int[] ARGB */
     jint* buf = (*env)->GetIntArrayElements(env, pixels, NULL);
-    const uint32_t* src = (const uint32_t*)data;
-    size_t stride = pitch / 4;
-    for (unsigned y = 0; y < height; y++) {
-        for (unsigned x = 0; x < width; x++) {
-            uint32_t px = src[y * stride + x];
-            buf[y * width + x] = (jint)(0xFF000000 | px);
+
+    switch (g_pixel_format) {
+        case RETRO_PIXEL_FORMAT_XRGB8888: {
+            /* 4 bytes per pixel: 0xXXRRGGBB */
+            const uint32_t* src = (const uint32_t*)data;
+            size_t stride = pitch / 4;
+            for (unsigned y = 0; y < height; y++) {
+                for (unsigned x = 0; x < width; x++) {
+                    uint32_t px = src[y * stride + x];
+                    buf[y * width + x] = (jint)(0xFF000000 | (px & 0x00FFFFFF));
+                }
+            }
+            break;
+        }
+        case RETRO_PIXEL_FORMAT_RGB565: {
+            /* 2 bytes per pixel: RRRRRGGGGGGBBBBB */
+            const uint16_t* src = (const uint16_t*)data;
+            size_t stride = pitch / 2;
+            for (unsigned y = 0; y < height; y++) {
+                for (unsigned x = 0; x < width; x++) {
+                    uint16_t px = src[y * stride + x];
+                    uint8_t r5 = (px >> 11) & 0x1F;
+                    uint8_t g6 = (px >> 5)  & 0x3F;
+                    uint8_t b5 =  px        & 0x1F;
+                    uint8_t r8 = (uint8_t)((r5 << 3) | (r5 >> 2));
+                    uint8_t g8 = (uint8_t)((g6 << 2) | (g6 >> 4));
+                    uint8_t b8 = (uint8_t)((b5 << 3) | (b5 >> 2));
+                    buf[y * width + x] = (jint)(0xFF000000 | (r8 << 16) | (g8 << 8) | b8);
+                }
+            }
+            break;
+        }
+        case RETRO_PIXEL_FORMAT_0RGB1555:
+        default: {
+            /* 2 bytes per pixel: 0RRRRRGGGGGBBBBB */
+            const uint16_t* src = (const uint16_t*)data;
+            size_t stride = pitch / 2;
+            for (unsigned y = 0; y < height; y++) {
+                for (unsigned x = 0; x < width; x++) {
+                    uint16_t px = src[y * stride + x];
+                    uint8_t r5 = (px >> 10) & 0x1F;
+                    uint8_t g5 = (px >> 5)  & 0x1F;
+                    uint8_t b5 =  px        & 0x1F;
+                    uint8_t r8 = (uint8_t)((r5 << 3) | (r5 >> 2));
+                    uint8_t g8 = (uint8_t)((g5 << 3) | (g5 >> 2));
+                    uint8_t b8 = (uint8_t)((b5 << 3) | (b5 >> 2));
+                    buf[y * width + x] = (jint)(0xFF000000 | (r8 << 16) | (g8 << 8) | b8);
+                }
+            }
+            break;
         }
     }
+
     (*env)->ReleaseIntArrayElements(env, pixels, buf, 0);
 
     (*env)->CallVoidMethod(env, g_runtime, g_onVideoFrame,
@@ -140,8 +189,15 @@ static bool environment_cb(unsigned cmd, void* data) {
         }
         case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT: {
             const enum retro_pixel_format* fmt = (const enum retro_pixel_format*)data;
-            /* Accept XRGB8888 and RGB565 */
-            return (*fmt == RETRO_PIXEL_FORMAT_XRGB8888 || *fmt == RETRO_PIXEL_FORMAT_RGB565);
+            /* Accept 0RGB1555, XRGB8888, and RGB565 -- video_refresh_cb
+             * handles conversion for all three. */
+            if (*fmt == RETRO_PIXEL_FORMAT_0RGB1555 ||
+                *fmt == RETRO_PIXEL_FORMAT_XRGB8888 ||
+                *fmt == RETRO_PIXEL_FORMAT_RGB565) {
+                g_pixel_format = *fmt;
+                return true;
+            }
+            return false;
         }
         case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
         case RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY:
@@ -194,6 +250,7 @@ Java_com_ludere_legacy_libretro_LibretroRuntime_nativeInit(
     /* Cache Java object and method IDs */
     if (g_runtime) (*env)->DeleteGlobalRef(env, g_runtime);
     g_runtime = (*env)->NewGlobalRef(env, thiz);
+    g_pixel_format = RETRO_PIXEL_FORMAT_0RGB1555;
 
     jclass cls = (*env)->GetObjectClass(env, thiz);
     g_onVideoFrame = (*env)->GetMethodID(env, cls, "onVideoFrame", "([IIII)V");
