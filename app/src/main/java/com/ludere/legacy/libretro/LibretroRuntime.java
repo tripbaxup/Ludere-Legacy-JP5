@@ -129,14 +129,39 @@ public class LibretroRuntime {
     private final Runnable mEmulationLoop = new Runnable() {
         @Override
         public void run() {
+            // Without pacing, this loop runs as fast as the CPU allows
+            // (hundreds of "frames" per second instead of ~60), so a
+            // brief button tap gets sampled across many extra emulated
+            // frames and looks like the input is being spammed/held.
+            // Pace each iteration to the core's real target frame time.
+            double fps = nativeGetTargetFps();
+            if (fps <= 0.0) fps = 60.0;
+            long frameNanos = (long) (1_000_000_000.0 / fps);
+            long nextFrameTime = System.nanoTime();
+
             while (mRunning) {
                 if (mPaused) {
                     synchronized (this) {
                         try { wait(); } catch (InterruptedException ignored) {}
                     }
+                    // Don't let a long pause cause a burst of catch-up frames.
+                    nextFrameTime = System.nanoTime();
                     continue;
                 }
+
                 nativeRunFrame();
+
+                nextFrameTime += frameNanos;
+                long sleepNanos = nextFrameTime - System.nanoTime();
+                if (sleepNanos > 0) {
+                    try {
+                        Thread.sleep(sleepNanos / 1_000_000L, (int) (sleepNanos % 1_000_000L));
+                    } catch (InterruptedException ignored) {}
+                } else {
+                    // Fell behind (e.g. slow device/frame) -- don't try to
+                    // burst-catch-up, just resync to avoid runaway drift.
+                    nextFrameTime = System.nanoTime();
+                }
             }
         }
     };
@@ -194,4 +219,5 @@ public class LibretroRuntime {
     private native void nativePause();
     private native void nativeResume();
     private native void nativeDestroy();
+    private native double nativeGetTargetFps();
 }
