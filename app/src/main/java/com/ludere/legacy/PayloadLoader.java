@@ -81,8 +81,32 @@ public class PayloadLoader {
             return null;
         }
 
+        // 4. Derive overlay preset from the core if config.xml didn't
+        // explicitly set one. Without this, any payload that omits
+        // <overlayPreset> silently falls back to "default" (which
+        // includes an analog stick meant for N64/PSX-style systems)
+        // instead of the layout that actually matches the console.
+        if (config.overlayPreset == null || "default".equals(config.overlayPreset)) {
+            String derived = presetForCore(config.core);
+            if (derived != null) config.overlayPreset = derived;
+        }
+
         Log.i(TAG, "Payload loaded: rom=" + config.romFile + " core=" + config.core);
         return config;
+    }
+
+    /** Maps a resolved libretro core id to the matching overlay.xml preset name. */
+    private static String presetForCore(String core) {
+        switch (core) {
+            case "fceumm":            return "nes";
+            case "snes9x":            return "snes";
+            case "gambatte":          return "gb";
+            case "mgba":              return "gba";
+            case "genesis_plus_gx":   return "genesis";
+            case "mupen64plus_next":  return "n64";
+            case "mednafen_psx_hw":   return "psx";
+            default:                  return null; // keep "default" preset
+        }
     }
 
     /**
