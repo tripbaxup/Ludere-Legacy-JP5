@@ -39,6 +39,7 @@ static void  (*g_retro_deinit)(void)                      = NULL;
 static bool  (*g_retro_load_game)(const struct retro_game_info*) = NULL;
 static void  (*g_retro_unload_game)(void)                 = NULL;
 static void  (*g_retro_run)(void)                         = NULL;
+static void  (*g_retro_reset)(void)                       = NULL;
 static size_t(*g_retro_get_memory_size)(unsigned)         = NULL;
 static void* (*g_retro_get_memory_data)(unsigned)         = NULL;
 static size_t(*g_retro_serialize_size)(void)              = NULL;
@@ -225,6 +226,7 @@ static void load_core_symbols(void) {
     LOAD_SYM(retro_load_game)
     LOAD_SYM(retro_unload_game)
     LOAD_SYM(retro_run)
+    LOAD_SYM(retro_reset)
     LOAD_SYM(retro_get_memory_size)
     LOAD_SYM(retro_get_memory_data)
     LOAD_SYM(retro_serialize_size)
@@ -333,6 +335,13 @@ Java_com_ludere_legacy_libretro_LibretroRuntime_nativeRunFrame(
     JNIEnv* env, jobject thiz)
 {
     if (g_retro_run && !g_paused) g_retro_run();
+}
+
+JNIEXPORT void JNICALL
+Java_com_ludere_legacy_libretro_LibretroRuntime_nativeReset(
+    JNIEnv* env, jobject thiz)
+{
+    if (g_retro_reset) g_retro_reset();
 }
 
 JNIEXPORT void JNICALL
