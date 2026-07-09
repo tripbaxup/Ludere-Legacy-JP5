@@ -55,6 +55,11 @@ public class LibretroRuntime {
     private boolean mRunning = false;
     private boolean mPaused  = false;
 
+    // Guarded by simple volatile read/write from the UI thread; only ever
+    // read by the emulation loop thread once per iteration, so a plain
+    // volatile is sufficient (no compound operations on it).
+    private volatile int mSpeedMultiplier = 1;
+
     private String mRomPath;
     private String mCorePath;
     private String mSavePath;
@@ -144,6 +149,26 @@ public class LibretroRuntime {
         }
     }
 
+    /** Resets the running game to its power-on state (does not reload SRAM/state). */
+    public void reset() {
+        nativeReset();
+    }
+
+    /**
+     * Enables/disables fast-forward. While enabled, the emulation loop
+     * runs several real frames back-to-back per paced "tick" instead of
+     * sleeping, multiplying effective game speed without breaking frame
+     * pacing (audio/video callbacks still fire normally per frame, they
+     * just arrive in bursts).
+     */
+    public void setFastForward(boolean enabled) {
+        mSpeedMultiplier = enabled ? 4 : 1;
+    }
+
+    public boolean isFastForwarding() {
+        return mSpeedMultiplier > 1;
+    }
+
     public void stop() {
         mRunning = false;
         mPaused  = false;
@@ -183,7 +208,10 @@ public class LibretroRuntime {
                     continue;
                 }
 
-                nativeRunFrame();
+                int steps = mSpeedMultiplier;
+                for (int i = 0; i < steps && mRunning && !mPaused; i++) {
+                    nativeRunFrame();
+                }
 
                 nextFrameTime += frameNanos;
                 long sleepNanos = nextFrameTime - System.nanoTime();
@@ -250,6 +278,7 @@ public class LibretroRuntime {
 
     private native void nativeInit(String romPath, String coreId, String savePath, String nativeLibDir);
     private native void nativeRunFrame();
+    private native void nativeReset();
     private native void nativePause();
     private native void nativeResume();
     private native void nativeDestroy();
