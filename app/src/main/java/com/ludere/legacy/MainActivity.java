@@ -1,6 +1,8 @@
 package com.ludere.legacy;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.res.AssetManager;
 import android.opengl.GLSurfaceView;
 import android.os.Build;
@@ -9,6 +11,7 @@ import android.os.Handler;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Toast;
 
 import com.ludere.legacy.audio.AudioEngine;
 import com.ludere.legacy.input.InputManager;
@@ -44,6 +47,10 @@ public class MainActivity extends Activity {
     private SaveManager mSaveManager;
 
     private boolean mRuntimeStarted = false;
+
+    // Single quick-save slot used by the pause menu's Save/Load State.
+    private static final int QUICK_SAVE_SLOT = 0;
+    private AlertDialog mPauseDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -161,5 +168,106 @@ public class MainActivity extends Activity {
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) applyImmersiveMode();
+    }
+
+    // ─── Pause menu (back button) ──────────────────────────────────────────────
+
+    @Override
+    public void onBackPressed() {
+        if (!mRuntimeStarted) {
+            super.onBackPressed();
+            return;
+        }
+        showPauseMenu();
+    }
+
+    private void showPauseMenu() {
+        if (mPauseDialog != null && mPauseDialog.isShowing()) return;
+
+        // Pause emulation/audio while the menu is up, but leave the
+        // GLSurfaceView alone so the last frame stays visible behind the
+        // dialog instead of going black.
+        if (mRuntime != null) mRuntime.pause();
+        if (mAudioEngine != null) mAudioEngine.pause();
+
+        boolean hasState = mSaveManager != null && mSaveManager.hasState(QUICK_SAVE_SLOT);
+        boolean ffOn     = mRuntime != null && mRuntime.isFastForwarding();
+
+        final String[] items = {
+            "Resume",
+            "Save State",
+            hasState ? "Load State" : "Load State (none saved)",
+            "Reset Game",
+            ffOn ? "Fast Forward: On" : "Fast Forward: Off",
+            "Exit Game",
+        };
+
+        mPauseDialog = new AlertDialog.Builder(this)
+            .setTitle(mConfig != null ? mConfig.title : "Paused")
+            .setItems(items, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    handlePauseMenuChoice(which);
+                }
+            })
+            .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                @Override
+                public void onCancel(DialogInterface dialog) {
+                    resumeFromPauseMenu();
+                }
+            })
+            .setCancelable(true)
+            .show();
+    }
+
+    private void handlePauseMenuChoice(int which) {
+        switch (which) {
+            case 0: // Resume
+                resumeFromPauseMenu();
+                return;
+
+            case 1: // Save State
+                if (mSaveManager != null) {
+                    mSaveManager.saveState(QUICK_SAVE_SLOT);
+                    Toast.makeText(this, "State saved", Toast.LENGTH_SHORT).show();
+                }
+                resumeFromPauseMenu();
+                return;
+
+            case 2: // Load State
+                if (mSaveManager != null && mSaveManager.hasState(QUICK_SAVE_SLOT)) {
+                    mSaveManager.loadState(QUICK_SAVE_SLOT);
+                    Toast.makeText(this, "State loaded", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, "No saved state", Toast.LENGTH_SHORT).show();
+                }
+                resumeFromPauseMenu();
+                return;
+
+            case 3: // Reset Game
+                if (mRuntime != null) mRuntime.reset();
+                Toast.makeText(this, "Game reset", Toast.LENGTH_SHORT).show();
+                resumeFromPauseMenu();
+                return;
+
+            case 4: // Fast Forward toggle
+                if (mRuntime != null) {
+                    mRuntime.setFastForward(!mRuntime.isFastForwarding());
+                    Toast.makeText(this,
+                        mRuntime.isFastForwarding() ? "Fast forward on" : "Fast forward off",
+                        Toast.LENGTH_SHORT).show();
+                }
+                resumeFromPauseMenu();
+                return;
+
+            case 5: // Exit Game
+                finish();
+                return;
+        }
+    }
+
+    private void resumeFromPauseMenu() {
+        if (mRuntime != null) mRuntime.resume();
+        if (mAudioEngine != null) mAudioEngine.resume();
     }
 }
