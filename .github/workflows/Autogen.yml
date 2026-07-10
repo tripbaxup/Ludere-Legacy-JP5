@@ -36,11 +36,19 @@ jobs:
       - name: Verify payload
         id: verify
         run: |
-          XML_COUNT=$(find autogen/input -maxdepth 1 -type f -iname "*.xml" | wc -l)
+          # overlay.xml is optional and separate from the config XML --
+          # count them independently so a payload that includes both
+          # doesn't create ambiguity about which XML is the config.
+          CONFIG_XML_COUNT=$(find autogen/input -maxdepth 1 -type f -iname "*.xml" ! -iname "overlay.xml" | wc -l)
           PNG_COUNT=$(find autogen/input -maxdepth 1 -type f -iname "*.png" | wc -l)
 
-          if [ "$XML_COUNT" -lt 1 ]; then
-            echo "Missing config XML file (*.xml)"; exit 1
+          if [ "$CONFIG_XML_COUNT" -lt 1 ]; then
+            echo "Missing config XML file (*.xml, other than overlay.xml)"; exit 1
+          fi
+
+          if [ "$CONFIG_XML_COUNT" -gt 1 ]; then
+            echo "Found multiple candidate config XML files -- payload must contain exactly one config XML (plus an optional overlay.xml)."
+            exit 1
           fi
 
           if [ "$PNG_COUNT" -lt 1 ]; then
