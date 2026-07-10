@@ -83,6 +83,7 @@ public class VideoRenderer implements GLSurfaceView.Renderer {
     private volatile int     mPendingWidth;
     private volatile int     mPendingHeight;
     private volatile boolean mFrameReady = false;
+    private boolean mHasFrame = false; // GL-thread only; true once any frame has been uploaded
 
     public VideoRenderer(GLSurfaceView surfaceView, PayloadConfig config) {
         mSurfaceView = surfaceView;
@@ -127,31 +128,42 @@ public class VideoRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onDrawFrame(GL10 gl) {
+        // Upload a new frame if one has arrived since the last draw. This
+        // GL thread runs on the display's own vsync (RENDERMODE_CONTINUOUSLY),
+        // which is a separate clock from the emulation thread's paced ~60fps
+        // loop -- they will never stay perfectly locked together. Without
+        // persisting the last frame, any vsync where a new frame hasn't
+        // arrived yet would show pure black (a very visible bright/dim
+        // flicker), instead of just briefly re-showing the previous frame.
+        if (mFrameReady) {
+            int[] pixels = mPendingPixels;
+            int w = mPendingWidth;
+            int h = mPendingHeight;
+            mFrameReady = false;
+
+            if (pixels != null && w > 0 && h > 0) {
+                GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mTexture);
+                GLES20.glTexImage2D(
+                    GLES20.GL_TEXTURE_2D, 0,
+                    GLES20.GL_RGBA, w, h, 0,
+                    GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE,
+                    ByteBuffer.wrap(intsToBytes(pixels))
+                );
+                mFrameWidth  = w;
+                mFrameHeight = h;
+                mHasFrame    = true;
+            }
+        }
+
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
 
-        if (!mFrameReady) return;
-
-        int[] pixels = mPendingPixels;
-        int w = mPendingWidth;
-        int h = mPendingHeight;
-        mFrameReady = false;
-
-        if (pixels == null || w == 0 || h == 0) return;
-
-        // Upload texture
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mTexture);
-        IntBuffer buf = IntBuffer.wrap(pixels);
-        GLES20.glTexImage2D(
-            GLES20.GL_TEXTURE_2D, 0,
-            GLES20.GL_RGBA, w, h, 0,
-            GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE,
-            ByteBuffer.wrap(intsToBytes(pixels))
-        );
+        if (!mHasFrame) return; // nothing uploaded yet at all
 
         // Compute viewport for scaling
-        applyScaledViewport(w, h);
+        applyScaledViewport(mFrameWidth, mFrameHeight);
 
-        // Draw quad
+        // Draw quad (reusing the currently bound texture, which still
+        // holds the most recent frame even if this call didn't upload one)
         GLES20.glUseProgram(mProgram);
 
         int posLoc = GLES20.glGetAttribLocation(mProgram, "aPosition");
