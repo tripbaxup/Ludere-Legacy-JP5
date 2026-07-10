@@ -9,7 +9,7 @@ mkdir -p "$OUTPUT"
 
 echo "Searching payload..."
 
-XML=$(find "$INPUT" -maxdepth 1 -type f -iname "*.xml" | head -n1)
+XML=$(find "$INPUT" -maxdepth 1 -type f -iname "*.xml" ! -iname "overlay.xml" | head -n1)
 PNG=$(find "$INPUT" -maxdepth 1 -type f -iname "*.png" | head -n1)
 
 if [ -z "$XML" ]; then
